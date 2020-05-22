@@ -9,11 +9,11 @@ log_dir = os.path.join(result_dir, "log")
 benchmark_dir = os.path.join(result_dir, "benchmark")
 
 genome_ref = "ftp://ftp.ensembl.org/pub/release-75//fasta/homo_sapiens/dna/Homo_sapiens.GRCh37.75.dna.chromosome.22.fa.gz"
+samples = ["tumor", "normal"]
 
 rule all:
   input:
-    
-#    multiext(os.path.join(ref_dir, "Homo_sapiens.GRCh37.75.dna.chromosome.22.fa"), ".fai", ".amb", ".ann", ".bwt", ".pac", ".sa") 
+    expand(os.path.join(analysis_dir, "{sample}.sorted.bam"), sample = samples)
 
 rule download_ref:
   output:
@@ -56,11 +56,15 @@ rule bwa_index:
 bwa index {input} &> {log}
     """ 
 
+def get_fastq_files(wildcards):
+  """Return a list of fastq files for a sample"""
+  return expand(os.path.join(fastq_dir, "{sample}_{readpair}.fastq"), readpair=[1, 2], **wildcards) 
+
 rule mapping:
   input:
     fa = rules.download_ref.output,
     fa_index = rules.bwa_index.output,
-    reads = expand(os.path.join(fastq_dir, "{sample}_{rp}.fastq", rp=["1", "2"]))
+    reads = get_fastq_files
   output:
     os.path.join(analysis_dir, "{sample}.sorted.bam")
   version: "0.0.1"
@@ -69,5 +73,5 @@ rule mapping:
   benchmark: os.path.join(benchmark_dir, "mapping_{sample}.tsv")
   shell:
     """
-bwa mem {input.fa} {input.reads} | samtools sort | samtools view -Sb - > {output}
+(bwa mem {input.fa} {input.reads} | samtools sort | samtools view -Sb - > {output} ) &> {log}
     """
