@@ -25,3 +25,15 @@ conda install -c bioconda -c conda-forge vardict-java bcftools samtools bwa rtg-
 ```
 pip install -r requirements.txt 
 ```
+
+#### Step 5: Run workflow
+
+```
+snakemake --cores 2 -p
+```
+
+#### Step 6: Generate a report
+
+```
+snakemake --report && open report.html
+```
