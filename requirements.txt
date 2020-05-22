@@ -1,0 +1,6 @@
+snakemake==5.17.0
+jinja2
+pygraphviz 
+networkx
+pygments
+graphviz

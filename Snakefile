@@ -5,14 +5,21 @@ result_dir = "result"
 fastq_dir = "fastq"
 analysis_dir = os.path.join(result_dir, "analysis")
 ref_dir = os.path.join(result_dir, "ref")
+sdf_dir = os.path.join(ref_dir, "sdf")
 log_dir = os.path.join(result_dir, "log")
 benchmark_dir = os.path.join(result_dir, "benchmark")
 
 genome_ref = "ftp://ftp.ensembl.org/pub/release-75//fasta/homo_sapiens/dna/Homo_sapiens.GRCh37.75.dna.chromosome.22.fa.gz"
+ref_region = "resources/region.bed"
+vcf_truth = "resources/truth_set.vcf.gz"
 samples = ["tumor", "normal"]
+VAF_threshold = 0.01
 
 rule all:
   input:
+    os.path.join(analysis_dir, "somatic.vcf.gz"),
+    os.path.join(analysis_dir, "var_eval_af", "summary_af.svg"),
+    os.path.join(analysis_dir, "var_eval_dp", "summary_dp.svg"),
     expand(os.path.join(analysis_dir, "{sample}.sorted.bam"), sample = samples)
 
 rule download_ref:
@@ -26,6 +33,20 @@ rule download_ref:
   shell:
     """
 wget -a {log} -O - {params.genome_ref_path} | gunzip > {output} 
+    """
+
+rule ref_format:
+  input:
+    os.path.join(ref_dir, "Homo_sapiens.GRCh37.75.dna.chromosome.22.fa")
+  output:
+    directory(os.path.join(ref_dir, sdf_dir))
+  version: "0.0.1"
+  message: "Generating SDF file for reference Fasta"
+  log: os.path.join(log_dir, "ref_format.log")
+  benchmark: os.path.join(benchmark_dir, "ref_format.tsv")
+  shell:
+    """
+rtg format -o {output} {input}
     """
 
 rule samtools_index:
@@ -73,5 +94,69 @@ rule mapping:
   benchmark: os.path.join(benchmark_dir, "mapping_{sample}.tsv")
   shell:
     """
-(bwa mem {input.fa} {input.reads} | samtools sort | samtools view -Sb - > {output} ) &> {log}
+(bwa mem {input.fa} {input.reads} | samtools sort | samtools view -Sb - > {output} && samtools index {output} ) &> {log}
+    """
+
+rule vardict_call:
+  input:
+    fa=rules.download_ref.output,
+    fai=rules.samtools_index.output,
+    tumorbam=os.path.join(analysis_dir, "tumor.sorted.bam"),
+    normalbam=os.path.join(analysis_dir, "normal.sorted.bam"),
+    bed= ref_region
+  output:
+    vcf=os.path.join(analysis_dir, "somatic.vcf.gz")
+  params:
+    tumorname="tumor",
+    normalname="normal",
+    VAF=VAF_threshold,
+    vardict='-c 1 -S 2 -E 3 -g 4'
+  version: "0.0.1"
+  message: "Variant calling"
+  log: os.path.join(log_dir, "vardict_call.log")
+  benchmark: os.path.join(benchmark_dir, "vardict_call.tsv")
+  shell:
+    """
+vardict-java \
+  -G {input.fa} \
+  -f {params.VAF} \
+  -N tumor \
+  -b \"{input.tumorbam}|{input.normalbam}\" \
+  {params.vardict} \
+  {input.bed} \
+  | testsomatic.R \
+  | var2vcf_paired.pl -N \"{params.tumorname}|{params.normalname}\" \
+    -f {params.VAF} \
+  | bcftools filter -e \'STATUS !~ \".*Somatic\"\' \
+  | bcftools view -f PASS --output-file {output.vcf} --output-type z;
+tabix -p vcf {output.vcf};
+    """ 
+
+rule eval_variantcall:
+  input:
+    call = os.path.join(analysis_dir, "somatic.vcf.gz"),
+    truth = vcf_truth, 
+    sdf = rules.ref_format.output
+  output:
+    af_summary = report(os.path.join(analysis_dir, "var_eval_af", "summary_af.svg"), caption="resources/AF_eval.rst", category="Evaluation"),
+    dp_summary = report(os.path.join(analysis_dir, "var_eval_dp", "summary_dp.svg"), caption="resources/DP_eval.rst", category="Evaluation"),
+  params:
+    af_eval = os.path.join(analysis_dir, "var_eval_af"),
+    dp_eval = os.path.join(analysis_dir, "var_eval_dp"),
+  version: "0.0.1"
+  message: "Evaluating variant call"
+  log: os.path.join(log_dir, "eval_variantcall.log")
+  benchmark: os.path.join(benchmark_dir, "eval_variantcall.tsv")
+  shell:
+    """
+rm -r {params.af_eval} && rm -r {params.dp_eval};
+rm {output.af_summary} && rm {output.dp_summary};
+rtg vcfeval -b {input.truth} -c {input.call} \
+  -o {params.af_eval} -t {input.sdf} \
+  --sample SAMPLE,tumor --vcf-score-field INFO.AF &> {log};
+rtg rocplot --svg {output.af_summary} {params.af_eval}/weighted_roc.tsv.gz &>> {log}; 
+rtg vcfeval -b {input.truth} -c {input.call} \
+  -o {params.dp_eval} -t {input.sdf} \
+  --sample SAMPLE,tumor --vcf-score-field INFO.DP &>> {log}
+rtg rocplot --svg {output.dp_summary} {params.dp_eval}/weighted_roc.tsv.gz &>> {log}; 
     """
