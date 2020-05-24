@@ -1,0 +1,6 @@
+rule generate_random:
+  output:
+    "result/random.gen"
+  shell:
+    "jot -r 5 0 100 > {output}"
+

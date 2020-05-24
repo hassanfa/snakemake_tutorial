@@ -1,0 +1,14 @@
+rule create_file:
+  input:
+    "result/random.gen"
+  output:
+    "analysis/processed.random"
+  run:
+    with open(str(input)) as f:
+      lines = [line.rstrip() for line in f]
+    
+    lines = list(map(int, lines))
+    total_value = sum(lines)
+    
+    with open(str(output), "w") as f:
+      f.write("%s" % total_value)
