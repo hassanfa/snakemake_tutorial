@@ -72,6 +72,7 @@ rule bwa_index:
   message: "Preparing bwa index for reference"
   log: os.path.join(log_dir, "reference_index.log")
   benchmark: os.path.join(benchmark_dir, "reference_index.tsv")
+  singularity: "docker://clinicalgenomics/bwa:0.7.17"
   shell:
     """
 bwa index {input} &> {log}
