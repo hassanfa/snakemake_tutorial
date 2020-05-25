@@ -1,0 +1,6 @@
+samples: 
+  - "tumor"
+  - "normal"
+read_pairs:
+  - 1
+  - 2
