@@ -1,8 +1,8 @@
 rule create_file:
   input:
-    "result/random.gen"
+    "result/random_{rand_count}.gen"
   output:
-    "analysis/processed.random"
+    "analysis/processed_{rand_count}.random"
   run:
     with open(str(input)) as f:
       lines = [line.rstrip() for line in f]

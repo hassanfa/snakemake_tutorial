@@ -44,6 +44,7 @@ rule ref_format:
   message: "Generating SDF file for reference Fasta"
   log: os.path.join(log_dir, "ref_format.log")
   benchmark: os.path.join(benchmark_dir, "ref_format.tsv")
+  conda: "envs/rtg.yaml"
   shell:
     """
 rtg format -o {output} {input}
@@ -58,6 +59,7 @@ rule samtools_index:
   message: "Preparing samtools index for reference"
   log: os.path.join(log_dir, "reference_index.log")
   benchmark: os.path.join(benchmark_dir, "reference_index.tsv")
+  conda: "envs/bwa.yaml"
   shell:
     """
 samtools faidx {input} &> {log} 
@@ -73,6 +75,7 @@ rule bwa_index:
   log: os.path.join(log_dir, "reference_index.log")
   benchmark: os.path.join(benchmark_dir, "reference_index.tsv")
   singularity: "docker://clinicalgenomics/bwa:0.7.17"
+  conda: "envs/bwa.yaml"
   shell:
     """
 bwa index {input} &> {log}
@@ -93,6 +96,7 @@ rule mapping:
   message: "aligning to genome"
   log: os.path.join(log_dir, "mapping_{sample}.log")
   benchmark: os.path.join(benchmark_dir, "mapping_{sample}.tsv")
+  conda: "envs/bwa.yaml"
   shell:
     """
 (bwa mem {input.fa} {input.reads} | samtools sort | samtools view -Sb - > {output} && samtools index {output} ) &> {log}
@@ -116,6 +120,7 @@ rule vardict_call:
   message: "Variant calling"
   log: os.path.join(log_dir, "vardict_call.log")
   benchmark: os.path.join(benchmark_dir, "vardict_call.tsv")
+  conda: "envs/vardict.yaml"
   shell:
     """
 vardict-java \
@@ -148,6 +153,7 @@ rule eval_variantcall:
   message: "Evaluating variant call"
   log: os.path.join(log_dir, "eval_variantcall.log")
   benchmark: os.path.join(benchmark_dir, "eval_variantcall.tsv")
+  conda: "envs/rtg.yaml"
   shell:
     """
 rm -r {params.af_eval} && rm -r {params.dp_eval};

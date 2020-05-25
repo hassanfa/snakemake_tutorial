@@ -1,6 +1,8 @@
 rule generate_random:
   output:
-    "result/random.gen"
+    "result/random_{rand_count}.gen"
+  params:
+    rand_count = "{rand_count}"
   shell:
-    "jot -r 5 0 100 > {output}"
+    "jot -r {params.rand_count} 0 100 > {output}"
 
