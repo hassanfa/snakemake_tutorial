@@ -2,7 +2,7 @@ FROM hassanf/miniconda3_4.6.14:latest
 
 LABEL maintainer="Hassan Foroughi hassan dot foroughi at scilifelab dot se" 
 LABEL description="Bioinfo tools for snakemake tutorial"
-LABEL version="4.2.4"
+LABEL version="0.0.1"
 
 # create necessary directories
 # install balsamic and it's environments
